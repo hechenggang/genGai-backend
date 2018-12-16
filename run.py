@@ -7,9 +7,9 @@ from api.article import bp_api_article
 # 创建 Flask 实例
 app = Flask(__name__)
 # 掛載藍圖
-app.register_blueprint(bp_api_verification, url_prefix='/api/verification')
-app.register_blueprint(bp_api_user, url_prefix='/api/user')
-app.register_blueprint(bp_api_article, url_prefix='/api/article')
+app.register_blueprint(bp_api_verification, url_prefix='/verification')
+app.register_blueprint(bp_api_user, url_prefix='/user')
+app.register_blueprint(bp_api_article, url_prefix='/article')
 
 @app.route('/')
 def page_index():

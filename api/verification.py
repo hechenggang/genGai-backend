@@ -1,7 +1,7 @@
 # coding=utf-8
 import sys
 sys.path.append('..')
-from flask import Flask,request,jsonify,make_response
+from flask import Flask,request,jsonify,make_response,send_file
 from flask import Blueprint
 from database.session import getSession,Verification
 
@@ -11,18 +11,33 @@ from tools import string_to_md5
 
 import functools
 
+from PIL import Image, ImageDraw, ImageFont, ImageFilter
+from io import BytesIO
+
+# 文字转图片数据流
+def text_to_png(input_text=None):
+    image = Image.new('RGBA', size=(100, 40), color=(255, 255, 255, 0))
+    font = ImageFont.truetype(font='./src/font/font.ttf', size=50)
+    draw = ImageDraw.Draw(image)
+    draw.text(xy=(7, 2), text=input_text, font=font, fill=(0,0,0))
+    byte_img = BytesIO()
+    image.save(byte_img,'png')
+    byte_img.seek(0)
+    return byte_img
+
+
 # 为反馈添加跨域头部
 def cross(F):
     @functools.wraps(F)
-    def dec():
+    def dec(*args,**kwargs):
+        print (args,kwargs)
         if request.method == 'OPTIONS':
             resp = make_response('')
         else:
-            resp = make_response(F())
+            resp = make_response(F(*args,**kwargs))
         resp.headers['Access-Control-Allow-Headers'] = 'Content-Type'
         resp.headers['Access-Control-Allow-Origin'] = '*'
         resp.headers['Access-Control-Allow-Methods'] = '*'
-        resp.headers['Server'] = 'Imhcg'
         return resp
     return dec
 
@@ -30,8 +45,7 @@ def cross(F):
 # resiger a bluepoint 
 bp_api_verification = Blueprint('api_verification',__name__)
 
-# build apis base on this bluepoint
-# get verification code
+# 生成验证码
 @bp_api_verification.route('/get')
 @cross
 def get():
@@ -47,7 +61,7 @@ def get():
     timestamp = int(str(time.time()).replace('.','')[0:13])
     _id = string_to_md5(timestamp,mix=True)
        
-    # write to database
+    # 写入数据库
     db = getSession()
     veri = Verification(id=_id,timestamp=timestamp,question=question,answer=answer)
     db.add(veri)
@@ -56,18 +70,37 @@ def get():
     return jsonify({
         'ok':True,
         'data':{
-            'id':_id,
-            'question':question
+            'id':_id
         }
     })
 
+# 获取验证图片
+@bp_api_verification.route('/img/<_id>')
+@cross
+def getImg(*args,**kwargs):
+    print (args,kwargs)
+    if '_id' in kwargs:
+        _id = kwargs['_id']
+        db = getSession()
+        veri = db.query(Verification).filter(Verification.id == _id).first()
+        if not veri:
+            return jsonify({
+                'ok':False,
+                'message':'該驗證碼不存在。'
+            })
 
-# get verification code
+        return send_file(text_to_png(veri.question+'='), mimetype='image/png')
+    else:
+        return jsonify({
+                'ok':False,
+                'message':'意料之外的错误。'
+            })
+
+
+# 测试验证码
 @bp_api_verification.route('/test',methods=['POST','OPTIONS'])
 @cross
 def use():
-    if request.method == 'OPTIONS':
-        return ''
 
     req = request.json
     # print(req)
