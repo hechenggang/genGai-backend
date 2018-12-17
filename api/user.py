@@ -12,6 +12,9 @@ from tools import string_to_md5
 
 from api.verification import cross
 from api.verification import check
+from api.mail import send_fpassword_reset_mail
+
+from threading import Thread
 
 # resiger a bluepoint 
 bp_api_user = Blueprint('api_user',__name__)
@@ -139,3 +142,78 @@ def signup():
             'message':'产生了一些预料之外的错误，我们会尽快修复。'
         })
 
+@bp_api_user.route('/get_password_reset_code',methods=['POST','OPTIONS'])
+@cross
+def get_password_reset_code():
+    req = request.json
+    # 檢查參數是否齊全
+    if not(('id' in req) and ('answer' in req) and ('mail' in req)):
+        return jsonify({
+            'ok':False,
+            'message':'不要非法侵入本站喔。'
+        })
+
+    result = check(req=req,delete=True)
+    if not result:
+        return jsonify({
+            'ok':False,
+            'message':'验证码错误，你是机器人吗？'
+        })
+
+    db = getSession()
+    _id = string_to_md5(req['mail'],mix=False)
+    is_user = db.query(User).filter(User.id == _id).first()
+    if not is_user:
+        return jsonify({
+            'ok':False,
+            'message':'你还没注册过喔。'
+        })
+
+    url = 'https://app.d-c.bid/gengai/#/forget?mail={0}&code={1}'.format(is_user.mail,is_user.password)
+    t = Thread(target=send_fpassword_reset_mail,args=(is_user.mail,is_user.name,url))
+    t.start()
+    return jsonify({
+        'ok':True,
+    })
+
+
+@bp_api_user.route('/reset_password',methods=['POST','OPTIONS'])
+@cross
+def reset_password():
+    req = request.json
+    # 檢查參數是否齊全
+    if not(('id' in req) and ('answer' in req) and ('mail' in req) and ('password' in req) and ('code' in req)):
+        return jsonify({
+            'ok':False,
+            'message':'不要非法侵入本站喔。'
+        })
+
+    result = check(req=req,delete=True)
+    if not result:
+        return jsonify({
+            'ok':False,
+            'message':'验证码错误/失效，你是机器人吗？'
+        })
+
+    db = getSession()
+    _id = string_to_md5(req['mail'],mix=False)
+    is_user = db.query(User).filter(User.id == _id).first()
+    if not is_user:
+        return jsonify({
+            'ok':False,
+            'message':'你还没注册过。'
+        })
+
+    if is_user.password == req['code']:
+        password = string_to_md5(req['password'])
+        is_user.password = password
+        db.commit()
+        
+        return jsonify({
+            'ok':True
+        })
+    else:
+        return jsonify({
+            'ok':False,
+            'message':'校验码已失效'
+        })

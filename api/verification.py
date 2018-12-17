@@ -4,7 +4,6 @@ sys.path.append('..')
 from flask import Flask,request,jsonify,make_response,send_file
 from flask import Blueprint
 from database.session import getSession,Verification
-
 import random
 import time
 from tools import string_to_md5
@@ -30,7 +29,6 @@ def text_to_png(input_text=None):
 def cross(F):
     @functools.wraps(F)
     def dec(*args,**kwargs):
-        print (args,kwargs)
         if request.method == 'OPTIONS':
             resp = make_response('')
         else:
