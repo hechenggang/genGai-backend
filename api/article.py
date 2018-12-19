@@ -34,7 +34,7 @@ def today():
     if not latest:
         return jsonify({
             'ok':False
-        })
+        }),404
     
     # 最新一条记录是否今天，如果不是今天就返回空内容。
     if timestamp_to_yymmdd(latest.timestamp) != timestamp_to_yymmdd():
@@ -62,7 +62,7 @@ def save():
     if len(content) > 200:
         return jsonify({
             'ok':False,
-            'message':'字数超过限定。'
+            'message':'字数超过限定'
         })
 
     db = getSession()
@@ -116,8 +116,8 @@ def history():
     
     if not history:
         return jsonify({
-            'ok':False
-        })
+            'ok':False,
+        }),404
 
     return jsonify({
         'ok':True,

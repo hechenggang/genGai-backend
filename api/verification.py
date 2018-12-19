@@ -13,6 +13,8 @@ import functools
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 from io import BytesIO
 
+from threading import Thread
+
 # 文字转图片数据流
 def text_to_png(input_text=None):
     image = Image.new('RGBA', size=(100, 40), color=(255, 255, 255, 0))
@@ -40,31 +42,52 @@ def cross(F):
     return dec
 
 
-# resiger a bluepoint 
+# 验证装饰器
+def need_verification(F):
+    @functools.wraps(F)
+    def dec(*args,**kwargs):
+        if not check(req=request.json):
+            resp = jsonify({
+                'ok':False,
+                'message':'你是机器人吗？'
+            })
+        else:
+            resp = make_response(F(*args,**kwargs))
+        return resp
+    return dec
+
+
+# 注册蓝图
 bp_api_verification = Blueprint('api_verification',__name__)
 
 # 生成验证码
 @bp_api_verification.route('/get')
 @cross
 def get():
+    # 准备一个随机问题
     number_list = ['0','1','2','3','4','5','6','7','8','9']
     num1 = random.choice(number_list)
     num2 = random.choice(number_list)
-
     operators = ['+','-','*']
     opt = random.choice(operators)
 
-    question = num1+opt+num2
-    answer = eval(num1+opt+num2)
+    # 准备一条验证记录
     timestamp = int(str(time.time()).replace('.','')[0:13])
     _id = string_to_md5(timestamp,mix=True)
-       
-    # 写入数据库
+    question = num1+opt+num2
+    answer = eval(num1+opt+num2)
+    
+    # 写入记录到数据库
     db = getSession()
     veri = Verification(id=_id,timestamp=timestamp,question=question,answer=answer)
     db.add(veri)
     db.commit()
+    db.close()
 
+    # 启动另外一个线程来清理过期验证码
+    Thread(target=clean).start()
+
+    # 返回生成记录的唯一标识
     return jsonify({
         'ok':True,
         'data':{
@@ -72,110 +95,120 @@ def get():
         }
     })
 
-# 获取验证图片
+
+# 获取验证的图片
 @bp_api_verification.route('/img/<_id>')
 @cross
 def getImg(*args,**kwargs):
-    print (args,kwargs)
+    # 校验输入
     if '_id' in kwargs:
         _id = kwargs['_id']
+        # 查询记录
         db = getSession()
         veri = db.query(Verification).filter(Verification.id == _id).first()
+        db.close()
         if not veri:
             return jsonify({
                 'ok':False,
-                'message':'該驗證碼不存在。'
+                'message':'无效的查询'
             })
 
+        # 调用字符转图片函数生成验证码的图片并返回
         return send_file(text_to_png(veri.question+'='), mimetype='image/png')
     else:
         return jsonify({
                 'ok':False,
-                'message':'意料之外的错误。'
+                'message':'参数错误'
             })
 
 
-# 测试验证码
-@bp_api_verification.route('/test',methods=['POST','OPTIONS'])
-@cross
-def use():
+# # 测试验证码
+# @bp_api_verification.route('/test',methods=['POST','OPTIONS'])
+# @cross
+# def use():
+#     req = request.json
+#     if not(('id' in req) and ('answer' in req)):
+#         return jsonify({
+#             'ok':False,
+#             'message':'参数错误'
+#         })
 
-    req = request.json
-    # print(req)
-    # 檢查參數是否齊全
-    if not(('id' in req) and ('answer' in req)):
-        return jsonify({
-            'ok':False,
-            'message':'不要非法侵入本站喔。'
-        })
+#     _id = req['id']
+#     db = getSession()
+#     veri = db.query(Verification).filter(Verification.id == _id).first()
+#     if not veri:
+#         return jsonify({
+#             'ok':False,
+#             'message':'验证码不存在。'
+#         })
 
-    # 查找驗證碼記錄
-    _id = req['id']
-    db = getSession()
-    veri = db.query(Verification).filter(Verification.id == _id).first()
-    if not veri:
-        return jsonify({
-            'ok':False,
-            'message':'該驗證碼不存在。'
-        })
+#     timestamp = veri.timestamp
+#     passed_time = int(str(time.time()).replace('.','')[0:13]) - int(timestamp)
+#     passed_time = int(passed_time/1000/60)
+#     if passed_time > 5:
+#         return jsonify({
+#             'ok':False,
+#             'message':'验证码过期'
+#         })
 
-    # 檢查驗證碼是否過期
-    timestamp = veri.timestamp
-    passed_time = int(str(time.time()).replace('.','')[0:13]) - int(timestamp)
-    passed_time = int(passed_time/1000/60)
-    # print (passed_time)
-    if passed_time > 5:
-        return jsonify({
-            'ok':False,
-            'message':'{0}分鍾過去了，你需要重新請求驗證碼。'.format(passed_time)
-        })
+#     if str(veri.answer) != str(req['answer']):
+#         return jsonify({
+#             'ok':False,
+#             'message':'验证码错误'
+#         })
 
-    # 檢查驗證碼是否正確
-    # print(veri.answer,req['answer'])
-    if str(veri.answer) != str(req['answer']):
-        return jsonify({
-            'ok':False,
-            'message':'驗證失敗，請檢查輸入。'
-        })
-
-    # 通過驗證
-    return jsonify({
-        'ok':True,
-        'message':'驗證通過。'
-    })
+#     db.close()
+#     return jsonify({
+#         'ok':True,
+#         'message':'验证通过'
+#     })
 
 
-# 提供对外接口
+# 删除过期验证码
+def clean():
+    try:
+        db = getSession()
+        timenow = int(str(time.time()).replace('.','')[0:13])
+        overdue = db.query(Verification).filter((timenow - Verification.timestamp) > 300000).all()
+        for i in overdue:
+            db.delete(i)
+        db.commit()
+        db.close()
+        print('过期验证码清理完成')
+        return True
+    except:
+        return False
+
+
+# 提供对外检测接口
 def check(req=None,delete=False):
-    
+    # 输入校验
     if not req:
         return False
-    # 檢查參數是否齊全
     if not(('id' in req) and ('answer' in req)):
         return False
 
-    # 查找驗證碼記錄
+    # 提取记录
     _id = req['id']
     db = getSession()
     veri = db.query(Verification).filter(Verification.id == _id).first()
     if not veri:
         return False
 
-    # 檢查驗證碼是否過期
+    # 检查时效
     timestamp = veri.timestamp
     passed_time = int(str(time.time()).replace('.','')[0:13]) - int(timestamp)
     passed_time = int(passed_time/1000/60)
     if passed_time > 5:
         return False
 
-    # 檢查驗證碼是否正確
+    # 检查答案
     if str(veri.answer) != str(req['answer']):
         return False
 
-    if delete:
-        # 刪除數據
-        db.delete(veri)
-        db.commit()
-
-    # 通過驗證
+    # 验证成功，删除验证码
+    db.delete(veri)
+    db.commit()
+    db.close()
     return True
+

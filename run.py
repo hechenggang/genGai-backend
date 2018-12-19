@@ -4,23 +4,18 @@ from api.verification import bp_api_verification
 from api.user import bp_api_user
 from api.article import bp_api_article
 
+# 创建 Flask 实例
+app = Flask(__name__)
+# 挂载蓝图
+app.register_blueprint(bp_api_verification, url_prefix='/verification')
+app.register_blueprint(bp_api_user, url_prefix='/user')
+app.register_blueprint(bp_api_article, url_prefix='/article') 
 
-
-def create_app():
-    # 创建 Flask 实例
-    app = Flask(__name__)
-    # 掛載藍圖
-    app.register_blueprint(bp_api_verification, url_prefix='/verification')
-    app.register_blueprint(bp_api_user, url_prefix='/user')
-    app.register_blueprint(bp_api_article, url_prefix='/article') 
-    return app   
-
-app = create_app()
 @app.route('/')
 def page_index():
     return jsonify({
         'ok':True,
-        'message':'API serve.'
+        'message':'API service of gengai.'
     })
 
 if __name__ == '__main__':
