@@ -26,33 +26,25 @@ def login_require(F):
         req = None
         _id = None
         _hash = None
-        resp = jsonify({
-            'ok':False,
-            'message':'非法请求'
-        }),400
-
+        # 校验输入
         try:
             req = request.json
             _id = req['auth'].split('->')[0]
             _hash = req['auth'].split('->')[1]
         except:
-            pass
-        
-        if req or _id or _hash :
-            resp = make_response(jsonify({
+            return jsonify({
                 'ok':False,
-                'message':'密钥无效'
-            })),401
-       
+                'message':'非法请求'
+            }),400
+        # 检查用户是否存在
         if _id and _hash:
-            # 检查用户是否存在
             db = getSession()
             is_user = db.query(User).filter(User.id == _id).first()
             if not is_user:
                 resp = make_response(jsonify({
                     'ok':False,
                     'message':'密钥无效'
-                })),403
+                })),401
 
             elif not (is_user.password == _hash):
                 resp = make_response(jsonify({
@@ -75,7 +67,10 @@ def login():
     try:
         req = request.json
     except:
-        pass
+        return jsonify({
+                'ok':False,
+                'message':'非法请求'
+            }),400
 
     if not(('id' in req) and ('answer' in req) and ('mail' in req) and ('password' in req) and ('timestamp' in req)):
         return jsonify({

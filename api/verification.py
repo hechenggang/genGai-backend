@@ -119,7 +119,7 @@ def getImg(*args,**kwargs):
         if not veri:
             return jsonify({
                 'ok':False,
-                'message':'无效的查询'
+                'message':'该记录已失效'
             })
 
         # 调用字符转图片函数生成验证码的图片并返回
