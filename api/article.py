@@ -22,15 +22,11 @@ bp_api_article = Blueprint('api_article',__name__)
 @bp_api_article.route('/today',methods=['POST','OPTIONS'])
 @cross
 @login_require
-def today():
-    req = request.json
-    user_id = req['auth'].split('->')[0]
-
+def today(auth):
+    user_id = auth['_id']
     db = getSession()
-
     # 提取用户最新记录
     latest = db.query(Article).filter(Article.user_id == user_id).order_by(Article.timestamp.desc()).first()
-    
     if not latest:
         return jsonify({
             'ok':False
@@ -40,7 +36,7 @@ def today():
     if timestamp_to_yymmdd(latest.timestamp) != timestamp_to_yymmdd():
         return jsonify({
             'ok':False
-        })
+        }),204
 
     # 最新一条记录以存在，且记录时间是今天时，返回该记录内容
     return jsonify({
@@ -55,15 +51,15 @@ def today():
 @bp_api_article.route('/save',methods=['POST','OPTIONS'])
 @cross
 @login_require
-def save():
+def save(auth):
     req = request.json
-    user_id = req['auth'].split('->')[0]
+    user_id = auth['_id']
     content = req['content']
     if len(content) > 200:
         return jsonify({
             'ok':False,
             'message':'字数超过限定'
-        })
+        }),500
 
     db = getSession()
 
@@ -105,10 +101,8 @@ def save():
 @bp_api_article.route('/history',methods=['POST','OPTIONS'])
 @cross
 @login_require
-def history():
-    req = request.json
-    user_id = req['auth'].split('->')[0]
-
+def history(auth):
+    user_id = auth['_id']
     db = getSession()
 
     # 提取用户记录

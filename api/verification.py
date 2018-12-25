@@ -46,7 +46,16 @@ def cross(F):
 def need_verification(F):
     @functools.wraps(F)
     def dec(*args,**kwargs):
-        if not check(req=request.json):
+        req = None
+        try:
+            req = request.json
+        except:
+            return jsonify({
+                'ok':False,
+                'message':'非法请求'
+            })
+
+        if not check(req):
             resp = jsonify({
                 'ok':False,
                 'message':'你是机器人吗？'
@@ -174,7 +183,7 @@ def clean():
             db.delete(i)
         db.commit()
         db.close()
-        print('过期验证码清理完成')
+        # print('过期验证码清理完成')
         return True
     except:
         return False

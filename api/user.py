@@ -16,52 +16,71 @@ from api.mail import send_fpassword_reset_mail
 
 from threading import Thread
 
-# resiger a bluepoint 
+# 注册蓝图
 bp_api_user = Blueprint('api_user',__name__)
 
+# 鉴权装饰器
 def login_require(F):
     @functools.wraps(F)
     def dec():
-        req = request.json
-        if not('auth' in req):
+        req = None
+        _id = None
+        _hash = None
+        resp = jsonify({
+            'ok':False,
+            'message':'非法请求'
+        }),400
+
+        try:
+            req = request.json
+            _id = req['auth'].split('->')[0]
+            _hash = req['auth'].split('->')[1]
+        except:
+            pass
+        
+        if req or _id or _hash :
             resp = make_response(jsonify({
                 'ok':False,
-                'message':'auth 缺失。'
-            }))
-        else:
-            try:
-                # 校验密钥
-                db = getSession()
-                _id = req['auth'].split('->')[0]
-                # 检查用户是否存在
-                is_user = db.query(User.id).filter(User.id == _id).first()
-                if not is_user:
-                    resp = make_response(jsonify({
-                        'ok':False,
-                        'message':'失效的密钥'
-                    }))
-                else:
-                    resp = make_response(F())
-            except:
+                'message':'密钥无效'
+            })),401
+       
+        if _id and _hash:
+            # 检查用户是否存在
+            db = getSession()
+            is_user = db.query(User).filter(User.id == _id).first()
+            if not is_user:
                 resp = make_response(jsonify({
-                        'ok':False,
-                        'message':'意料之外的错误'
-                    }))
+                    'ok':False,
+                    'message':'密钥无效'
+                })),403
+
+            elif not (is_user.password == _hash):
+                resp = make_response(jsonify({
+                    'ok':False,
+                    'message':'校验失败'
+                })),403
+
+            else:
+                resp = make_response(F(auth={'_id':_id,'_hash':_hash}))
         return resp
     return dec
 
-# build apis base on this bluepoint
+# 登录
 @bp_api_user.route('/login',methods=['POST','OPTIONS'])
 @cross
 @need_verification
 def login():
-    
     # 校验输入
-    req = request.json
+    req = None
+    try:
+        req = request.json
+    except:
+        pass
+
     if not(('id' in req) and ('answer' in req) and ('mail' in req) and ('password' in req) and ('timestamp' in req)):
         return jsonify({
             'ok':False,
-            'message':'不要非法侵入本站喔。'
+            'message':'参数错误'
         })
 
     # 查询记录
@@ -97,8 +116,12 @@ def login():
 @cross
 @need_verification
 def signup():
-    # 输入校验
-    req = request.json
+    # 校验输入
+    req = None
+    try:
+        req = request.json
+    except:
+        pass
     if not(('id' in req) and ('answer' in req) and ('mail' in req) and ('password' in req) and ('timestamp' in req)):
         return jsonify({
             'ok':False,
@@ -137,8 +160,12 @@ def signup():
 @cross
 @need_verification
 def get_password_reset_code():
-    req = request.json
-    # 檢查參數是否齊全
+    # 校验输入
+    req = None
+    try:
+        req = request.json
+    except:
+        pass
     if not(('id' in req) and ('answer' in req) and ('mail' in req)):
         return jsonify({
             'ok':False,
@@ -166,8 +193,12 @@ def get_password_reset_code():
 @cross
 @need_verification
 def reset_password():
-    req = request.json
-    # 檢查參數是否齊全
+    # 校验输入
+    req = None
+    try:
+        req = request.json
+    except:
+        pass
     if not(('id' in req) and ('answer' in req) and ('mail' in req) and ('password' in req) and ('code' in req)):
         return jsonify({
             'ok':False,
