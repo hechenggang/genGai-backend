@@ -11,7 +11,7 @@ app.register_blueprint(bp_api_verification, url_prefix='/verification')
 app.register_blueprint(bp_api_user, url_prefix='/user')
 app.register_blueprint(bp_api_article, url_prefix='/article') 
 
-@app.route('/')
+@app.route('/') 
 def page_index():
     return jsonify({
         'ok':True,
@@ -19,4 +19,4 @@ def page_index():
     })
 
 if __name__ == '__main__':
-    app.run(threaded=True,debug=False,host='0.0.0.0',port=10080)
+    app.run(threaded=True,debug=True,host='0.0.0.0',port=10080)

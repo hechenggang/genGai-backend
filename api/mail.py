@@ -1,26 +1,33 @@
 # coding=utf-8
+import sys
+sys.path.append('..')
+import config
+
 import smtplib
 from email.mime.text import MIMEText
 from email.header import Header
+from email.utils import formataddr,parseaddr
 
 
-def send_fpassword_reset_mail(receiver=None, username=None, set_password_link=None):
-    print('开始发送邮件')
-    sender = 'Gengai@d-c.bid'
-    receivers = []
-    receivers.append(receiver)
-    html = '''
-        <p>嘿，{1}，<br>你可以<a href="{0}">点我</a>，或用浏览器打开下方链接来重置密码。</p>
-        <pre class="link">{0}</pre>
-        '''.format(set_password_link, username)
-    message = MIMEText(html, 'html', 'utf-8')
-    message['From'] = "{0}".format(sender)
-    message['To'] = "{0}".format(receiver)
-    message['Subject'] = '重置梗概轻日记的密码'
+def send(user=None, content=None, subject=None):
+    # print('开始发送邮件')
+    # print(user,content,subject)
+    # print((Header(config.app['name']),config.mail_config['username']))
+    message = MIMEText(content, 'html', 'utf-8')
+    message['From'] = _formataddr('{} <{}>'.format(config.app['name'],config.mail_config['username']))
+    message['To'] = _formataddr('{} <{}>'.format(user['name'],user['mail']))
+    message['Subject'] = Header(subject)
+    # print (message.as_string())
+    smtp = smtplib.SMTP_SSL(host=config.mail_config['server'])
+    smtp.connect(config.mail_config['server'], config.mail_config['port'])
+    smtp.login(config.mail_config['username'], config.mail_config['password'])
+    smtp.sendmail(config.mail_config['username'], [user['mail']], message.as_string())
+    smtp.quit()
+    # print ('发送成功')
 
-    smtpObj = smtplib.SMTP()
-    smtpObj.connect('smtp.ym.163.com', 25)
-    smtpObj.login('gengai@d-c.bid', 'Abc19216811')
-    smtpObj.sendmail(sender, [receiver], message.as_string())
-    smtpObj.quit()
-    print ('发送成功')
+def _header(name):
+    return Header(name,'utf-8').encode()
+
+def _formataddr(string):
+    name, addr = parseaddr(string)
+    return formataddr((_header(name),addr))

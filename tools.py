@@ -18,5 +18,8 @@ def timestamp_to_yymmdd(timestamp=None):
         return time.strftime('%Y-%m-%d',time.localtime(float(timestamp)))
     return time.strftime('%Y-%m-%d',time.localtime())
 
-# print (timestamp_to_yymmdd())
-# print(string_to_md5('123456789',mix=True))
+def check_item_in_dict(items,dic):
+    for item in items:
+        if not(item in dic):
+            return False
+    return True
